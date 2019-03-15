@@ -1,14 +1,17 @@
 package com.novoda.gradle.test
 
+import java.nio.file.Paths
+
 class BuildFolder {
 
     private Closure<File> rootDirProvider
 
     BuildFolder(String path = '') {
         def start = new File(getResource('.').file)
-        if (start.path.endsWith('build/classes/groovy/test')) {
+        def startPath = Paths.get(start.path)
+        if (startPath.endsWith('build/classes/groovy/test')) {
             rootDir(new File(start.parentFile.parentFile.parentFile, path))
-        } else if (start.path.endsWith('out/test/classes')) {
+        } else if (startPath.endsWith('out/test/classes')) {
             rootDir(new File(start.parentFile.parentFile.parentFile, "build/$path"))
         } else {
             throw new UnsupportedOperationException("Unable to identify build folder from path: $start")
