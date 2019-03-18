@@ -46,6 +46,7 @@ class ReleasePluginTest {
                 BuildConfiguration.forAndroid('4.8', '3.2.0'),
                 BuildConfiguration.forAndroid('4.9', '3.2.0'),
                 BuildConfiguration.forAndroid('4.10', '3.2.0'),
+                BuildConfiguration.forKotlinAndroid('4.10', '3.2.0', '1.3.21'),
                 BuildConfiguration.forJava('4.0'),
                 BuildConfiguration.forJava('4.1'),
                 BuildConfiguration.forJava('4.2'),
@@ -57,6 +58,7 @@ class ReleasePluginTest {
                 BuildConfiguration.forJava('4.8'),
                 BuildConfiguration.forJava('4.9'),
                 BuildConfiguration.forJava('4.10'),
+                BuildConfiguration.forKotlin('4.10', '1.3.21'),
         ]
     }
 
@@ -120,8 +122,11 @@ class ReleasePluginTest {
     void shouldPackageAllSources() {
         GradleTruth.assertThat(result.task(configuration.packageSourcesTaskName)).hasOutcome(TaskOutcome.SUCCESS)
 
-        ConfigurableFileTree sourceFiles = testProject.fileTree('src/main/java')
-        List<String> includePatterns = sourceFiles.collect { '**' + it.path - sourceFiles.dir.path }
+        List<String> includePatterns = []
+        for (sourceSet in testProject.sourceSets()) {
+            ConfigurableFileTree generatedFiles = testProject.fileTree(sourceSet)
+            includePatterns += generatedFiles.collect { '**' + it.path - generatedFiles.dir.path }
+        }
         FileTree jarfile = testProject.zipTree('build/libs/test-sources.jar')
         assertThat(jarfile.matching { include includePatterns }).hasSize(includePatterns.size())
     }
@@ -193,6 +198,22 @@ class ReleasePluginTest {
             return new BuildConfiguration(buildGradleVersion, testProject)
         }
 
+        static BuildConfiguration forKotlinAndroid(String gradleVersion, String androidGradlePluginVersion, String kotlinVersion) {
+            def additionalRunnerConfig = { GradleRunner runner -> runner.withGradleVersion(gradleVersion) }
+            def buildGradleVersion = GradleVersion.version(gradleVersion)
+            def buildScript = addDependenciesTo(GradleScriptTemplates.forKotlinAndroidProject(androidGradlePluginVersion, kotlinVersion), buildGradleVersion)
+            def testProject = TestProject.newKotlinAndroidProject(buildScript, additionalRunnerConfig)
+            return new BuildConfiguration(buildGradleVersion, testProject)
+        }
+
+        static BuildConfiguration forKotlin(String gradleVersion, String kotlinVersion) {
+            def additionalRunnerConfig = { GradleRunner runner -> runner.withGradleVersion(gradleVersion) }
+            def buildGradleVersion = GradleVersion.version(gradleVersion)
+            def buildScript = addDependenciesTo(GradleScriptTemplates.forKotlinProject(kotlinVersion), buildGradleVersion)
+            def testProject = TestProject.newKotlinProject(buildScript, additionalRunnerConfig)
+            return new BuildConfiguration(buildGradleVersion, testProject)
+        }
+
         private static String addDependenciesTo(String buildscript, GradleVersion gradleVersion) {
             String compileScopeDependency = "${gradleVersion < GRADLE_4_1 ? 'compile' : 'api'} 'io.reactivex.rxjava2:rxjava:2.2.0'"
             String runtimeScopeDependency = gradleVersion < GRADLE_4_1 ? '' : 'implementation \'com.squareup.okio:okio:2.1.0\''
@@ -221,7 +242,7 @@ class ReleasePluginTest {
         }
 
         private boolean isAndroid() {
-            return testProject.projectType == 'android'
+            return testProject.isAndroid()
         }
 
         private String getPublicationName() {

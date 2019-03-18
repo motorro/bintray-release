@@ -18,8 +18,35 @@ class TestProject implements TestRule {
 
     private static final Action<GradleRunner> NONE = {}
 
+    private static final JAVA_SOURCE_SET = 'src/main/java'
+    private static final KOTLIN_SOURCE_SET = 'src/main/kotlin'
+
     private enum ProjectType {
-        JAVA, ANDROID
+        JAVA(false, false, [JAVA_SOURCE_SET].toSet()),
+        ANDROID(true, false, [JAVA_SOURCE_SET].toSet()),
+        KOTLIN(false, true, [KOTLIN_SOURCE_SET].toSet()),
+        KOTLIN_ANDROID(true, true, [KOTLIN_SOURCE_SET].toSet())
+
+        private boolean _isAndroid;
+        boolean isAndroid() {
+            return _isAndroid
+        }
+
+        private boolean _isKotlin;
+        boolean isKotlin() {
+            return _isKotlin
+        }
+
+        private Set<String> _sourceSets;
+        Set<String> sourceSets() {
+            return _sourceSets
+        }
+
+        ProjectType(boolean isAndroid, boolean isKotlin, Set<String> sourceSets) {
+            _isAndroid = isAndroid
+            _isKotlin = isKotlin
+            _sourceSets = sourceSets
+        }
     }
 
     private final ProjectType project
@@ -34,6 +61,14 @@ class TestProject implements TestRule {
 
     static TestProject newAndroidProject(String buildScript = GradleScriptTemplates.forAndroidProject(), Action<GradleRunner> additionalConfig = NONE) {
         return new TestProject(ProjectType.ANDROID, buildScript, additionalConfig)
+    }
+
+    static TestProject newKotlinProject(String buildScript = GradleScriptTemplates.forJavaProject(), Action<GradleRunner> additionalRunnerConfig = NONE) {
+        return new TestProject(ProjectType.KOTLIN, buildScript, additionalRunnerConfig)
+    }
+
+    static TestProject newKotlinAndroidProject(String buildScript = GradleScriptTemplates.forAndroidProject(), Action<GradleRunner> additionalConfig = NONE) {
+        return new TestProject(ProjectType.KOTLIN_ANDROID, buildScript, additionalConfig)
     }
 
     private TestProject(ProjectType project, String buildScript, Action<GradleRunner> additionalRunnerConfig) {
@@ -73,14 +108,22 @@ class TestProject implements TestRule {
     }
 
     private String createSourceCode() {
-        new File(projectDir, "src/main/java/HelloWorld.java").with {
-            getParentFile().mkdirs()
-            text = "public class HelloWorld {}"
+        if (project.isKotlin()) {
+            new File(projectDir, "src/main/kotlin/HelloWorld.kt").with {
+                getParentFile().mkdirs()
+                text = "public class HelloWorld {}"
+            }
+
+        } else {
+            new File(projectDir, "src/main/java/HelloWorld.java").with {
+                getParentFile().mkdirs()
+                text = "public class HelloWorld {}"
+            }
         }
     }
 
     private void createAndroidManifest() {
-        if (project == ProjectType.ANDROID) {
+        if (project.isAndroid()) {
             new File(projectDir, "/src/main/AndroidManifest.xml").with {
                 getParentFile().mkdirs()
                 text = "<manifest package=\"com.novoda.test\"/>"
@@ -117,6 +160,18 @@ class TestProject implements TestRule {
         } catch (UnexpectedBuildFailure e) {
             return new GradleBuildResult(e.buildResult, false)
         }
+    }
+
+    boolean isAndroid() {
+        return project.isAndroid()
+    }
+
+    boolean isKotlin() {
+        return project.isAndroid()
+    }
+
+    Set<String> sourceSets() {
+        return project.sourceSets()
     }
 
     File buildDir() {
